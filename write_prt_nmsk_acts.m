@@ -18,14 +18,14 @@ clear; close all; clc
 
 
 % params 2 find files
-rootdir = 'D:\study 3_CFS-fMRI_v2\data\';
-subjects_dir_pattern = '389*';
-files_pattern = '*_cnt2*.csv';
+rootdir = 'G:\study 3_CFS-fMRI_v2\data\';
+subjects_dir_pattern = '392*';
+files_pattern = '*_cnt1*.csv';
 subjects_dir_depth = '1';
 files_dir_depth = '2';
 
 % params 2 prt
-output_file_ext = 'nmsk2';
+output_file_ext = 'nmsk1';
 prt_type = 'vol';
 convert2Vol = 1;
 tr_length = 2;
@@ -38,10 +38,9 @@ predictors_names = {'nmsk_low_act1', 'nmsk_high_act1', ...
     'report'};
 predictors_idx = [1 2 3]; % the importent colomns in logfile to prt
 
-
-sub_folders = findfiles(rootdir, subjects_dir_pattern, 'dirs=1', ['depth=' subjects_dir_depth]);
+sub_folders = findFilesBVQX(rootdir, subjects_dir_pattern, struct('dirs',1,'depth',subjects_dir_depth));
 for s = 1:length(sub_folders)
-    datasets = findfiles(sub_folders{s}, files_pattern, ['depth=' files_dir_depth]);
+    datasets = findFilesBVQX(sub_folders{s}, files_pattern, struct('depth',files_dir_depth));
     for r = 1:length(datasets)
         t = readtable(datasets{r});
         logfile_data = table2array(t);

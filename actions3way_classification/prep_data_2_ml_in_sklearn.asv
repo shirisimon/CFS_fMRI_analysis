@@ -1,0 +1,46 @@
+
+% import voi
+clear all; close all; clc;
+
+%% PARAMETERS
+INPUTFILE_VOI = 'G:\study 3_CFS-fMRI_v2\data\mirror_loc_final.voi';
+INPUTDIR      = 'G:\study 3_CFS-fMRI_v2\data';
+INPUTPAT_VTC  = '*msk*TAL.vtc'; % only msk vtcs
+INPUTPAT_PRT  = '*_acts*.prt'; % only msk vtcs
+VOIs2Clust    = 1:15; % excluding outliers based on PDIST results
+
+voifile  = BVQXfile(INPUTFILE_VOI);
+vtcfiles = findFilesBVQX(INPUTDIR, INPUTPAT_VTC,struct('maxdepth',3));
+prtfiles = findFilesBVQX(INPUTDIR, INPUTPAT_PRT,struct('maxdepth',4));
+
+% LOAD VOI DATA:
+for vt = 1:length(vtcfiles)
+    vtc = BVQXfile(vtcfiles{vt});
+    for vo = 1:size(voifile.VOI,2)
+        if vt==1; voilist{vo} = voifile.VOI(vo).Name; end
+        voi_coords = tal2bv(voifile.VOI(vo).Voxels)';
+        voi_mat = vtc.VOITimeCourseOrig(voi_coords, Inf);
+        voi_mat = zscore(voi_mat{1});
+        voidata{vt,vo} = voi_mat;
+    end    
+    clear voi_mat
+    vtc.ClearObject();
+end
+
+% LOAD PRT DATA
+conds2classify_msk  = {'msk_low_act1', 'msk_low_act2',  'msk_low_act3', ...
+    'msk_high_act1','msk_high_act2','msk_high_act3'};
+conds2classify_nmsk = {'nmsk_low_act1', 'nmsk_low_act2',  'nmsk_low_act3', ...
+    'nmsk_high_act1','nmsk_high_act2','nmsk_high_act3'};
+for p = 1:length(prtfiles)
+    prt = BVQXfile(prtfiles{p});
+    prt = prt.Cond;
+    try conds_idx = getCondsTmps(prt, conds2classify_msk);
+    catch
+        conds_idx = getCondsTmps(prt, conds2classify_nmsk);
+    end
+    prtdata{p} = conds_idx; 
+end
+save('data2skl.mat', 'voidata', 'prtfiles', 'vtcfiles', 'voilist'); 
+
+[extractedData, labels] = getConditionsReleventVolums(runData,prtData, params);
