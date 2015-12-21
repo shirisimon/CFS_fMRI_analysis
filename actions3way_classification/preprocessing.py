@@ -3,8 +3,11 @@ import configuration
 import h5py
 from scipy import stats
 import numpy as np
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn import decomposition
+
+
 
 
 class DataLoader(object):
@@ -25,6 +28,11 @@ class DataLoader(object):
         return self.file[self.voidata[voi_idx, vtc_idx]][:].transpose()
 
     def get_prt_data(self, prt_idx):
+        """
+        get the onsets of each condition from prt
+        :param prt_idx:
+        :return:
+        """
         prt = self.file[self.prtdata[prt_idx,0]]
         conds = []
         for cond in range(self.params.conds_num):
@@ -33,7 +41,6 @@ class DataLoader(object):
             conds.append(tmps)
         return conds
 
-
     def get_vtc_filename(self, vtc_idx):
         s = []
         [s.append(u''.join(unichr(c))) for c in self.file[self.vtcfiles[0,vtc_idx]]]
@@ -41,33 +48,14 @@ class DataLoader(object):
 
 
 class Preprocessing(DataLoader):
-    # TODO: add print reports and timing
-    def do_preprocessing(self):
-        voisub_X_tr = [[None]*self.params.sub_num]*self.params.voi_num
-        voisub_y_tr = [[None]*self.params.sub_num]*self.params.voi_num
-        voisub_X_te = [[None]*self.params.sub_num]*self.params.voi_num
-        voisub_y_te = [[None]*self.params.sub_num]*self.params.voi_num
-        scale_mdl = [[None]*self.params.sub_num]*self.params.voi_num
-        pca_mdl   = [[None]*self.params.sub_num]*self.params.voi_num
-        vidx = 0 # voi idx
-        sidx = 0 # sub idx
-        for voi in xrange(self.voidata.chunks[0]):
-            for sub in self.params.sublist:
-                # concat each voi-sub to vols train and test sets
-                voisub_X_tr[vidx][sidx], voisub_y_tr[vidx][sidx] = \
-                    self.get_concat_vols_and_labels(sub+self.params.tr_pattern, voi)
-                voisub_X_te[vidx][sidx], voisub_y_te[vidx][sidx] = \
-                    self.get_concat_vols_and_labels(sub+self.params.te_pattern, voi)
-                # skl preprocessing of tr set:
-                scaler, voisub_X_tr[vidx][sidx] = self.skl_scaling(voisub_X_tr[vidx][sidx])
-                pca, voisub_X_tr[vidx][sidx] = self.skl_pca(voisub_X_tr[vidx][sidx])
-                scale_mdl[vidx][sidx] = scaler    # save the scaling model for each voi-sub
-                pca_mdl[vidx][sidx] = pca         # save the pca model for each voi-sub
-                vidx += 1
-                sidx += 1
-        return vidx, sidx
-        # save data:
-        #
+
+    def get_sub_data(self, voi):
+        for sub in self.params.sublist:
+            X_tr, y_tr = self.get_concat_vols_and_labels(sub+self.params.tr_pattern, voi)
+            X_te, y_te = self.get_concat_vols_and_labels(sub+self.params.te_pattern, voi)
+            pipe = self.skl_pipeline(X_tr)
+            y_tr = self.collapse_lbls(y_tr, (3,4,5), (0,1,2))
+            yield X_tr, y_tr, X_te, y_te, pipe
 
     def get_concat_vols_and_labels(self, vtc_pattern, voi_idx):
         """
@@ -80,17 +68,15 @@ class Preprocessing(DataLoader):
         cvols = []
         clbls = []
         for idx in vtcs_idx:
-            vtc = self.scale_vtc(idx, voi_idx)                     # zscore vtc
-            vols, lbls = self.extract_vtc_vols(idx, vtc)           # extract relevant volumes and labels
+            vtc = self.scale_vtc(idx, voi_idx)                              # zscore vtc
+            vols, lbls = self.extract_vtc_vols_and_labels(idx, vtc)         # extract relevant volumes and labels
             cvols.append(vols)
             clbls.append(lbls)
-        cvols = np.array(cvols)
-        clbls = np.array(clbls)# concat vtc volumes of one subject
-        vshape = (cvols.shape[0]*cvols.shape[1], cvols.shape[2])
-        lshape = (clbls.shape[0]*clbls.shape[1])
-        return np.reshape(cvols, vshape), np.reshape(clbls, lshape)
+        cvols = [c for c in np.array(cvols)]
+        clbls = [l for l in np.array(clbls)]
+        return np.concatenate((cvols)), np.concatenate((clbls))
 
-    def extract_vtc_vols(self, vtc_idx, vtc_data):
+    def extract_vtc_vols_and_labels(self, vtc_idx, vtc_data):
         """
         extract relevant volumes and labels from each vtc
         :param vtc_idx:
@@ -101,15 +87,27 @@ class Preprocessing(DataLoader):
         cvols = []
         clbls = []  # labels
         for cond in xrange(len(prt)):
-            vols = vtc_data[prt[cond],:]
-            lbls = len(prt[cond]) * [cond]
-            cvols.append(vols)                                     # concat conditions volumes of one vtc file
-            clbls.append(lbls)                                     # concat conditions labels of one vtc file
-        cvols = np.array(cvols)
-        clbls = np.array(clbls)
-        vshape = (cvols.shape[0]*cvols.shape[1], cvols.shape[2])
-        lshape = (clbls.shape[0]*clbls.shape[1])
-        return np.reshape(cvols, vshape), np.reshape(clbls, lshape)
+            vols = self.extract_cond_vols(vtc_data, prt[cond], self.params.tpoi)
+            lbls = vols.shape[0] * [cond]
+            cvols.append(vols)                                             # concat conditions volumes of one vtc file
+            clbls.append(lbls)                                             # concat conditions labels of one vtc file
+        cvols = [c for c in np.array(cvols)]
+        clbls = [l for l in np.array(clbls)]
+        return np.concatenate((cvols)), np.concatenate((clbls))
+
+    def extract_cond_vols(self, vtc_data, onsets, tpoi):
+        # TODO (if not working): add function of % signal change
+        """
+        convert vols by time points
+        :param vtc_data:
+        :param onsets: onset of events (list)
+        :param tpoi: time point of interest
+        :return:
+        """
+        cond_tpoi = [x+tpoi for x in onsets]
+        if cond_tpoi[-1]>vtc_data.shape[0]-1:
+            cond_tpoi = cond_tpoi[:-1]
+        return vtc_data[cond_tpoi, :]
 
     def scale_vtc(self, vtc_idx, voi_idx):
         mat = self.get_vtc_data(vtc_idx, voi_idx)
@@ -122,16 +120,43 @@ class Preprocessing(DataLoader):
                 idxlist.append(idx)
         return idxlist
 
-    def skl_scaling(self, X_train):
-        scaler  = StandardScaler().fit(X_train)                   # features scaling (should be done only on X train)
-        scaled_X_train = scaler.transform(X_train)
-        return scaler, scaled_X_train
-
-    def skl_pca(self, X_train):
+    def skl_pipeline(self, X_train):
+        """
+        create preprocessing pipeline and fit to X
+        :param X_train:
+        :return: pipeline object and fitted X
+        """
+        scaler  = StandardScaler()
         if self.params.do_pca:
             print("reducing dimensions with PCA")
-            pca = decomposition.KernelPCA(kernel='rbf').fit(X_train)
-            decomposed_X_train = pca.transform(X_train)
-            return pca, decomposed_X_train
+            pca = decomposition.KernelPCA(kernel='rbf')
+            pipe = Pipeline(steps=[('scale', scaler), ('pca', pca)]).fit(X_train)
         else:
-            return None, X_train
+            pipe = Pipeline(steps=[('scale', scaler)]).fit(X_train)
+        return pipe
+
+    def collapse_lbls(self, y, orig_lbls, target_lbls):
+        """
+        convert certain labels in y to other labels
+        :param y: labels list
+        :param orig_lbls: original labels (tuple)
+        :param target_lbls: target labels (tuple)
+        :return: y converted
+        """
+        for idx, item in enumerate(y):
+            if item in orig_lbls:
+                y[idx] = target_lbls[orig_lbls.index(item)]
+        return np.asarray(y)
+
+    def split_high_low_sets(self, X, y):
+        """
+        split high and low samples to different data sets (should be applied to test set)
+        :param X:
+        :param y:
+        :return:2*X and 2*y sets
+        """
+        X_high = X[np.logical_or(np.logical_or(y==3, y==4), y==5)]
+        y_high = y[np.logical_or(np.logical_or(y==3, y==4), y==5)]
+        X_low  = X[np.logical_or(np.logical_or(y==0, y==1), y==2)]
+        y_low  = y[np.logical_or(np.logical_or(y==0, y==1), y==2)]
+        return X_high, y_high, X_low, y_low
