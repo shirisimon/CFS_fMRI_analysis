@@ -4,12 +4,13 @@ from sklearn import ensemble
 
 class Params(object):
     def __init__(self):
+        self.collapse_opacities = False
         self.sublist         = ['379', '381', '382', '383', '384',
                                 '385', '386', '388', '389', '390',
                                 '391', '392', '393', '394', '395']  # TODO: get it from hdf file
         self.tr_pattern      = '_nmsk'
         self.te_pattern      = '_msk'
-        self.conds_num       = 6                                    # conditions number in one functional run
+        self.conds_num       = 3                                    # conditions number in one functional run
         self.do_pca          = True
         self.voi_num         = 15                                   # TODO: get it from hdf file
         self.sub_num         = 15                                   # TODO: get it from hdf file

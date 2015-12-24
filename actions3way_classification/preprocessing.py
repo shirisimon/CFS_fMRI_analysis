@@ -53,7 +53,8 @@ class Preprocessing(DataLoader):
             X_tr, y_tr = self.get_concat_vols_and_labels(sub+self.params.tr_pattern, voi)
             X_te, y_te = self.get_concat_vols_and_labels(sub+self.params.te_pattern, voi)
             pipe = self.skl_pipeline(X_tr)
-            y_tr = self.collapse_lbls(y_tr, (3,4,5), (0,1,2))
+            if self.params.collapse_opacities:
+                y_tr = self.collapse_lbls(y_tr, (3,4,5), (0,1,2))
             yield X_tr, y_tr, X_te, y_te, pipe
 
     def get_concat_vols_and_labels(self, vtc_pattern, voi_idx):

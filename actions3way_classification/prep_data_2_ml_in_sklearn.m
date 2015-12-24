@@ -34,10 +34,12 @@ for vt = 1:length(vtcfiles)
 end
 
 %% LOAD PRT DATA
-conds2classify_msk  = {'msk_low_act1', 'msk_low_act2',  'msk_low_act3', ...
-                       'msk_high_act1','msk_high_act2','msk_high_act3'};
-conds2classify_nmsk = {'nmsk_low_act1', 'nmsk_low_act2',  'nmsk_low_act3', ...
-                       'nmsk_high_act1','nmsk_high_act2','nmsk_high_act3'};
+% conds2classify_msk  = {'msk_low_act1', 'msk_low_act2',  'msk_low_act3', ...
+%                        'msk_high_act1','msk_high_act2','msk_high_act3'};
+% conds2classify_nmsk = {'nmsk_low_act1', 'nmsk_low_act2',  'nmsk_low_act3', ...
+%                        'nmsk_high_act1','nmsk_high_act2','nmsk_high_act3'};
+conds2classify_msk  = {'msk_high_act1', 'msk_high_act2',  'msk_high_act3'};
+conds2classify_nmsk = {'nmsk_high_act1', 'nmsk_high_act2',  'nmsk_high_act3'};
 for p = 1:length(prtfiles)
     prt = BVQXfile(prtfiles{p});
     prt = prt.Cond;
@@ -51,5 +53,5 @@ end
 %%
 % labels = [1:3, 1:3];
 % train_test_idx = [1:44, 45:88];
-save('data2skl.mat', 'voidata', 'prtdata', 'vtcfiles', 'voilist', '-v7.3'); 
+save('data2skl_high.mat', 'voidata', 'prtdata', 'vtcfiles', 'voilist', '-v7.3'); 
 
