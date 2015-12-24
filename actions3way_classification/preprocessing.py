@@ -9,7 +9,6 @@ from sklearn import decomposition
 
 
 
-
 class DataLoader(object):
     def __init__(self, path):
         """
@@ -74,7 +73,7 @@ class Preprocessing(DataLoader):
             clbls.append(lbls)
         cvols = [c for c in np.array(cvols)]
         clbls = [l for l in np.array(clbls)]
-        return np.concatenate((cvols)), np.concatenate((clbls))
+        return self.remove_nans_and_zeros(np.concatenate((cvols)), np.concatenate((clbls)))
 
     def extract_vtc_vols_and_labels(self, vtc_idx, vtc_data):
         """
@@ -87,7 +86,7 @@ class Preprocessing(DataLoader):
         cvols = []
         clbls = []  # labels
         for cond in xrange(len(prt)):
-            vols = self.extract_cond_vols(vtc_data, prt[cond], self.params.tpoi)
+            vols = self.extract_cond_vols(vtc_data, prt[cond], self.params.tpoi, self.params.baseline)
             lbls = vols.shape[0] * [cond]
             cvols.append(vols)                                             # concat conditions volumes of one vtc file
             clbls.append(lbls)                                             # concat conditions labels of one vtc file
@@ -95,8 +94,7 @@ class Preprocessing(DataLoader):
         clbls = [l for l in np.array(clbls)]
         return np.concatenate((cvols)), np.concatenate((clbls))
 
-    def extract_cond_vols(self, vtc_data, onsets, tpoi):
-        # TODO (if not working): add function of % signal change
+    def extract_cond_vols(self, vtc_data, onsets, tpoi, baseline):
         """
         convert vols by time points
         :param vtc_data:
@@ -104,13 +102,19 @@ class Preprocessing(DataLoader):
         :param tpoi: time point of interest
         :return:
         """
-        cond_tpoi = [x+tpoi for x in onsets]
+        cond_baseline = [x+baseline for x in onsets]
+        cond_tpoi     = [x+tpoi for x in onsets]
         if cond_tpoi[-1]>vtc_data.shape[0]-1:
             cond_tpoi = cond_tpoi[:-1]
-        return vtc_data[cond_tpoi, :]
+            cond_baseline = cond_baseline[:-1]
+        if self.params.baseline_method == 'epoch':
+            return np.true_divide(vtc_data[cond_tpoi, :],vtc_data[cond_baseline, :])
+        else:
+            return vtc_data[cond_tpoi, :]
 
     def scale_vtc(self, vtc_idx, voi_idx):
         mat = self.get_vtc_data(vtc_idx, voi_idx)
+        # mat = self.remove_nans_and_zeros_cols(mat) # remove cols with all nans or all zeros
         return stats.zscore(mat)
 
     def find_vtcs_idx(self, vtc_pattern):
@@ -160,3 +164,37 @@ class Preprocessing(DataLoader):
         X_low  = X[np.logical_or(np.logical_or(y==0, y==1), y==2)]
         y_low  = y[np.logical_or(np.logical_or(y==0, y==1), y==2)]
         return X_high, y_high, X_low, y_low
+
+    def remove_nans_and_zeros(self, X, y):
+        """
+        remove nans and zeros from the data
+        :param X: data for prediction [muse samples*channels]
+        :param y: data to predict [cz samples]
+        :return: X,y after removal
+        """
+        nan_cidx = np.where(np.all(np.isnan(X), axis=0))[0]  # index of columns with all nans
+        X = np.delete(X, nan_cidx, 1)
+        nan_ridx = np.where(np.any(np.isnan(X), axis=1))[0]  # index of rows with all nans
+        X = np.delete(X, nan_ridx, 0)
+        y = np.delete(y, nan_ridx, 0)
+
+        zeros_cidx = np.where(np.all(X == 0.0, axis=0))[0]  # index of columns with all zeros
+        X = np.delete(X, zeros_cidx, 1)
+        zeros_ridx = np.where(np.any(X == 0.0, axis=1))[0]  # index of rows with all zeros
+        X = np.delete(X, zeros_ridx, 0)
+        y = np.delete(y, zeros_ridx, 0)
+
+        return X, y
+
+    def remove_nans_and_zeros_cols(self, X):
+        """
+        remove nans and zeros from the data
+        :param X: data for prediction [muse samples*channels]
+        :param y: data to predict [cz samples]
+        :return: X,y after removal
+        """
+        nan_cidx = np.where(np.all(np.isnan(X), axis=0))[0]  # index of columns with all nans
+        X = np.delete(X, nan_cidx, 1)
+        zeros_cidx = np.where(np.all(X == 0.0, axis=0))[0]  # index of columns with all zeros
+        X = np.delete(X, zeros_cidx, 1)
+        return X
