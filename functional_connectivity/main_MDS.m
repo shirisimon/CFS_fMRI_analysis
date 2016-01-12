@@ -1,8 +1,8 @@
 clear all; close all; clc;
 
 %% PARAMETERS
-INPUTFILE_VOI = 'D:\study 3_CFS-fMRI_v2\data\mirror_loc_final.voi';
-INPUTDIR      = 'D:\study 3_CFS-fMRI_v2\data';
+INPUTFILE_VOI = 'G:\study 3_CFS-fMRI_v2\data\mirror_loc_final.voi';
+INPUTDIR      = 'G:\study 3_CFS-fMRI_v2\data';
 INPUTPAT_VTC  = '*_nmsk*mm.vtc'; % only msk vtcs
 VOIs2Clust    = 1:15; % excluding outliers based on PDIST results
 
@@ -32,5 +32,5 @@ mrdm = reshape(mrdm, size(mrdm,2), size(mrdm,3));
 
 %% 1. PLOT PDIST (look at the distances):
 [Y,e] = cmdscale(mrdm);
-plot(Y(:,1),Y(:,2),'.');
-text(Y(:,1),Y(:,2),voi_list);
+plot(Y(:,1),-Y(:,2),'.');
+text(Y(:,1),-Y(:,2),voi_list);

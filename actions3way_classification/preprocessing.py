@@ -6,6 +6,7 @@ import numpy as np
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn import decomposition
+from sklearn.cross_validation import StratifiedShuffleSplit
 
 
 
@@ -74,7 +75,31 @@ class Preprocessing(DataLoader):
             clbls.append(lbls)
         cvols = [c for c in np.array(cvols)]
         clbls = [l for l in np.array(clbls)]
-        return self.remove_nans_and_zeros(np.concatenate((cvols)), np.concatenate((clbls)))
+        cvols, clbls = self.remove_nans_and_zeros(np.concatenate((cvols)), np.concatenate((clbls)))
+        cvols, clbls = self.improve_snr(cvols, clbls)
+        return cvols, clbls
+
+    def improve_snr(self, cvols, clbls):
+        X_snr = []
+        y_snr = []
+        for cond in range(self.params.conds_num):
+            X, y = cvols[np.where(clbls==cond)], clbls[np.where(clbls==cond)]
+            n = int(y.shape[0])
+            groups = self.generate_snr_groups(n)
+            for arr in groups:
+                X_snr.append(np.mean(X[arr],axis=0))
+                y_snr.append(cond)
+        return np.asarray(X_snr), np.asarray(y_snr)
+
+    def generate_snr_groups(self, n):
+        if np.mod(n, self.params.snr_factor)==0:
+            return np.split(np.random.permutation(range(n)), n/self.params.snr_factor)
+        else:
+            residual = np.mod(n, self.params.snr_factor)
+            groups = np.split(np.random.permutation(range(n-residual)), (n-residual)/self.params.snr_factor)
+            groups.append(np.asarray([n-2, n-1]))
+            return groups
+
 
     def extract_vtc_vols_and_labels(self, vtc_idx, vtc_data):
         """
@@ -131,14 +156,23 @@ class Preprocessing(DataLoader):
         :param X_train:
         :return: pipeline object and fitted X
         """
-        scaler  = StandardScaler()
+        steps = []
+        if self.params.do_standard_scaling:
+            scaler = StandardScaler()
+            steps.append(('scale', scaler))
         if self.params.do_pca:
+            pca = decomposition.PCA(n_components=self.params.pca_variance)
             print("reducing dimensions with PCA")
-            pca = decomposition.KernelPCA(kernel='rbf')
-            pipe = Pipeline(steps=[('scale', scaler), ('pca', pca)]).fit(X_train)
+            print("number of components: %0.0f" % len(pca.explained_variance_ratio_))
+            steps.append(('pca', pca))
+        elif self.params.do_feature_selection:
+            pass
+
+        if not steps:
+            return None
         else:
-            pipe = Pipeline(steps=[('scale', scaler)]).fit(X_train)
-        return pipe
+            return Pipeline(steps=steps).fit(X_train)
+
 
     def collapse_lbls(self, y, orig_lbls, target_lbls):
         """
@@ -165,6 +199,14 @@ class Preprocessing(DataLoader):
         X_low  = X[np.logical_or(np.logical_or(y==0, y==1), y==2)]
         y_low  = y[np.logical_or(np.logical_or(y==0, y==1), y==2)]
         return X_high, y_high, X_low, y_low
+
+    def stratified_split(self, X, y, state):
+        skf = StratifiedShuffleSplit(y, n_iter=1, test_size=0.33, random_state=state)
+        for train_index, test_index in skf:
+            X_tr, X_te = X[train_index], X[test_index]
+            y_tr, y_te = y[train_index], y[test_index]
+        return X_tr, X_te, y_tr, y_te
+
 
     def remove_nans_and_zeros(self, X, y):
         """
@@ -199,3 +241,9 @@ class Preprocessing(DataLoader):
         zeros_cidx = np.where(np.all(X == 0.0, axis=0))[0]  # index of columns with all zeros
         X = np.delete(X, zeros_cidx, 1)
         return X
+
+    def convert(self, pipe, X):
+        if pipe is not None:
+            return pipe.transform(X)
+        else:
+            return X

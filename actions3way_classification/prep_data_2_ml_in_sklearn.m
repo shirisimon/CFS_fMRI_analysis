@@ -5,8 +5,8 @@ clear all; close all; clc;
 %% PARAMETERS
 INPUTFILE_VOI = 'G:\study 3_CFS-fMRI_v2\data\mirror_loc_final.voi';
 INPUTDIR      = 'G:\study 3_CFS-fMRI_v2\data';
-INPUTPAT_VTC_TR = '*nmsk*TAL.vtc'; 
-INPUTPAT_VTC_TE = '*_msk*TAL.vtc'; 
+INPUTPAT_VTC_TR = '*nmsk*mm.vtc'; 
+INPUTPAT_VTC_TE = '*_msk*mm.vtc'; 
 INPUTPAT_PRT_TR = '*nmsk*_acts*.prt'; 
 INPUTPAT_PRT_TE = '*_msk*_acts*.prt'; 
 VOIs2Clust    = 1:15; % excluding outliers based on PDIST results
@@ -53,5 +53,5 @@ end
 %%
 % labels = [1:3, 1:3];
 % train_test_idx = [1:44, 45:88];
-save('data2skl_high.mat', 'voidata', 'prtdata', 'vtcfiles', 'voilist', '-v7.3'); 
+save('data2skl_high_smoothed.mat', 'voidata', 'prtdata', 'vtcfiles', 'voilist', '-v7.3'); 
 
