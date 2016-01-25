@@ -17,7 +17,7 @@ def sub_analysis(subs, sub_data_generator):
             cv_scores  = []
             te1_scores = []
             te2_scores = []
-            for state in range(3):
+            for state in range(3): #
                 X_tr, X_te, y_tr, y_te = prep.stratified_split(X, y, state)
                 # train on nmsk:
                 algo, algo_params, score = prep.params.model
@@ -42,7 +42,10 @@ def sub_analysis(subs, sub_data_generator):
 def voi_analysis(vois, subs):
     for voi in vois:
         print("process voi: %0.0f" % voi)
-        sub_data_generator = prep.get_sub_data(voi)
+        if prep.params.fmri_data_type == 'raw':
+            sub_data_generator = prep.get_sub_raw_data(voi)
+        else:
+            sub_data_generator = prep.get_sub_betas_data(voi)
         yield zip(*sub_analysis(subs, sub_data_generator))
 
 def save_as_csv(filename, var):
@@ -52,7 +55,7 @@ def save_as_csv(filename, var):
 
 
 if __name__ == '__main__':
-    FILE_NAME = 'data2skl_high_smoothed.mat'
+    FILE_NAME = 'data2skl_high.mat'
     prep = prp.Preprocessing(FILE_NAME)
     vois = xrange(prep.voidata.chunks[0]-1)
     subs = xrange(len(cfg.Params().sublist))
@@ -75,14 +78,13 @@ ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
 ps.print_stats()
 
 
-# TODO: verify the mean result
-# TODO: feature selection methods
+# TODO: use betas as input
 # TODO: use avg rois as features
-# TODO: try use smoothed data and optimize
 # TODO: try visualization with mds
 
 
 # TRIED:
+# with smoothed, with snr, with lasso feature selection
 # pca optimization - (best for v1) is with 0.75 variance
 # only zscore and zscore + epoch based (% signal change)
 # classifers - svm rbf, random forest, lda (none is best)

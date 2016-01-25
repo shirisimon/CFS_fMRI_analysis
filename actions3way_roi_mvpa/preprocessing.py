@@ -6,8 +6,8 @@ import numpy as np
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn import decomposition
+from sklearn.feature_selection import SelectFromModel
 from sklearn.cross_validation import StratifiedShuffleSplit
-
 
 
 class DataLoader(object):
@@ -49,11 +49,11 @@ class DataLoader(object):
 
 class Preprocessing(DataLoader):
 
-    def get_sub_data(self, voi):
+    def get_sub_raw_data(self, voi):
         for sub in self.params.sublist:
             X_tr, y_tr = self.get_concat_vols_and_labels(sub+self.params.tr_pattern, voi)
             X_te, y_te = self.get_concat_vols_and_labels(sub+self.params.te_pattern, voi)
-            pipe = self.skl_pipeline(X_tr)
+            pipe = self.skl_pipeline(X_tr, y_tr)
             if self.params.collapse_opacities:
                 y_tr = self.collapse_lbls(y_tr, (3,4,5), (0,1,2))
             yield X_tr, y_tr, X_te, y_te, pipe
@@ -150,7 +150,7 @@ class Preprocessing(DataLoader):
                 idxlist.append(idx)
         return idxlist
 
-    def skl_pipeline(self, X_train):
+    def skl_pipeline(self, X_train, y_train):
         """
         create preprocessing pipeline and fit to X
         :param X_train:
@@ -161,17 +161,21 @@ class Preprocessing(DataLoader):
             scaler = StandardScaler()
             steps.append(('scale', scaler))
         if self.params.do_pca:
-            pca = decomposition.PCA(n_components=self.params.pca_variance)
-            print("reducing dimensions with PCA")
-            print("number of components: %0.0f" % len(pca.explained_variance_ratio_))
+            pca = decomposition.FactorAnalysis()
+            # pca = VarianceThreshold()
+            # pca = decomposition.KernelPCA(kernel='rbf')
+            # pca = decomposition.PCA(n_components=self.params.pca_variance)
             steps.append(('pca', pca))
         elif self.params.do_feature_selection:
-            pass
-
+            fsl = SelectFromModel(configuration.FeatureSelector().logistic_regression())
+            steps.append(('fsl', fsl))
         if not steps:
             return None
         else:
-            return Pipeline(steps=steps).fit(X_train)
+            if self.params.do_feature_selection:
+                Pipeline(steps=steps).fit(X_train, y_train)
+            else:
+                return Pipeline(steps=steps).fit(X_train)
 
 
     def collapse_lbls(self, y, orig_lbls, target_lbls):

@@ -1,7 +1,10 @@
 import numpy as np
+from sklearn import linear_model
 from sklearn import svm
+
 from sklearn import ensemble
 # from sklearn import lda
+
 
 class Params(object):
     def __init__(self):
@@ -12,15 +15,16 @@ class Params(object):
         self.tr_pattern           = '_nmsk'
         self.te_pattern           = '_msk'
         self.conds_num            = 3                                    # conditions number in one functional run
-        self.do_standard_scaling  = False
+        self.do_standard_scaling  = True
         self.do_pca               = False
         self.pca_variance         = 0.75
-        self.do_feature_selection = False
+        self.do_feature_selection = True
         self.voi_num              = 15                                   # TODO: get it from hdf file
         self.sub_num              = 15                                   # TODO: get it from hdf file
+        self.fmri_data_type       = 'betas'                              # 'raw' (% signal change) OR 'betas'
         self.tpoi                 = 2                                    # 'Time Point Of Interest' where the signal reach to its peak relative to onset
-        self.baseline             = -1
-        self.baseline_method      = 'file'                              # epoch based (divide by baseline) or file based (just zscore)
+        self.baseline             = 0
+        self.baseline_method      = 'file'                               # epoch based (divide by baseline) ORr file based (just zscore)
         self.snr_factor           = 3                                    # 1 (no snr), 3 (average across 3 trials)
         self.model                = Classifer().svc()
 
@@ -49,4 +53,11 @@ class Classifer():
         gs_params = [{'solver': ['svd', 'lsqr', 'eigen']}]
         scores = 'accuracy'
         return algo, gs_params, scores
+
+class FeatureSelector():
+
+    def logistic_regression(self):
+        return linear_model.LogisticRegression(penalty='l1')
+
+
 

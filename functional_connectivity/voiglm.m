@@ -1,11 +1,29 @@
-function [beta, pval]  = voiglm(sdm, vtc, contrasts, voi)
+function [beta, pval]  = voiglm(subdir, INPUTPAT_VTC, OUTPUTDIR_DMS, seed_name, contrasts, voi)
 
-X   = sdm.SDMMatrix;
+str_place = strsplit(subdir, '\'); % string place holder
+SUB_NUM   = ['*' str_place{end}];
+str_place = strfind(INPUTPAT_VTC, '*');
+SDM_TYPE  = INPUTPAT_VTC(str_place(1):str_place(2)); 
 
+vtcfiles = findFilesBVQX(subdir, INPUTPAT_VTC,struct('maxdepth',2));
+sdmfiles = findFilesBVQX(OUTPUTDIR_DMS, [seed_name '_' SUB_NUM '*' SDM_TYPE]);
+
+design_mat = [];
+voi2_rtc   = [];
 for vo2 = 1:size(voi.VOI,2);
-    voi2_coords = tal2bv(voi.VOI(vo2).Voxels)';
-    voi2_rtc    = zscore(vtc.VOITimeCourseOrig(voi2_coords));
-    
+    for vt = 1:length(vtcfiles)
+        if vo2 == 1
+            sdm = BVQXfile(sdmfiles{vt});
+            design_mat = [design_mat; sdm.SDMMatrix];
+        end
+        vtc = BVQXfile(vtcfiles{vt});
+        vtc.VTCData = zscore(vtc.VTCData);
+        voi2_coords = tal2bv(voi.VOI(vo2).Voxels)';
+        voi2_rtc    = [voi2_rtc; vtc.VOITimeCourseOrig(voi2_coords)];
+        vtc.ClearObject; clear vtc;
+        sdm.ClearObject; clear sdm;
+    end
+    X = design_mat;
     y = voi2_rtc;
     b = (X'*X)^(-1)*X'*y;
     e = y - X*b; 

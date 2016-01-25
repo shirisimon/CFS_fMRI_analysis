@@ -4,11 +4,11 @@
 clear all; close all; clc;
 
 %% PARAMETERS
-INPUTFILE_VOI = 'D:\study 3_CFS-fMRI_v2\data\mirror_loc_final.voi';
-INPUTDIR      = 'D:\study 3_CFS-fMRI_v2\data';
-INPUTPAT_VTC  = '*_msk*mm.vtc'; % only msk vtcs
-INPUTPAT_SDM  = '*_msk*mm*.sdm';
-OUTPUTDIR_DMS = 'D:\study 3_CFS-fMRI_v2\analysis\functional_connectivity\ppi_dms';
+INPUTFILE_VOI = 'G:\study3_CFS_fMRI_v2\data\mirror_loc_final.voi';
+INPUTDIR      = 'G:\study3_CFS_fMRI_v2\data';
+INPUTPAT_VTC  = '*_nmsk*mm.vtc'; % only msk vtcs
+INPUTPAT_SDM  = '*_nmsk*mm*.sdm';
+OUTPUTDIR_DMS = 'G:\study3_CFS-fMRI_v2\analysis\functional_connectivity\ppi_dms';
 PRD_LIST      = '"seedvoi*ML" "seedvoi*MH" "prdML" "prdMH" "seedvoi" "constant"';
 GENERATE_DMS  = 1; % generate sdms and mdms
 LOAD_MDMS     = 0; % to generate new glm with different parameters (opts)

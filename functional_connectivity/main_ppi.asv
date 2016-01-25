@@ -1,0 +1,158 @@
+
+%% TODO
+%  p val across subjects
+%  k means on voi rtcs with k=2
+%  rsa?
+
+clear all; close all; clc;
+
+%% PARAMETERS
+INPUTFILE_VOI = 'G:\study3_CFS_fMRI_v2\data\mirror_loc_final_ppisorted.voi';
+INPUTDIR      = 'G:\study3_CFS_fMRI_v2\data';
+INPUTPAT_VTC  = '*_nmsk*mm.vtc'; % only msk vtcs
+INPUTPAT_SDM  = '*_nmsk*mm*.sdm';
+OUTPUTDIR_DMS = 'G:\study3_CFS_fMRI_v2\data\ppi_dms';
+PRD_LIST      = '"seedvoi*NML" "seedvoi*NMH" "prdNML" "prdNMH" "seedvoi" "constant"';
+GLM_NAME      = 'manual_voisorted';
+GENERATE_DMS  = 1; % generate sdms and mdms
+GENERATE_GLM  = 1;
+CONTRASTS     = [1 0 0 0 0 0; 0 1 0 0 0 0]; % contrasts for not-confound predictors
+
+prdAcol       = 3; % colunm number in sdm file of condition A
+prdBcol       = 4; % colunm number in sdm file of condition B
+constant_col  = 7; % colunm number in sdm file of the constant
+
+voifile  = BVQXfile(INPUTFILE_VOI);
+subdirs  = findFilesBVQX(INPUTDIR, '3*',struct('dirs',1, 'maxdepth',1));
+vtcfiles = findFilesBVQX(INPUTDIR, INPUTPAT_VTC,struct('maxdepth',3));
+sdmfiles = findFilesBVQX(INPUTDIR, INPUTPAT_SDM,struct('maxdepth',3));
+
+%% MAIN
+
+for vo1 = 1:size(voifile.VOI,2)
+    %% 1. get seed voi rtc
+    seed_coords = tal2bv(voifile.VOI(vo1).Voxels)';
+    seed_name   = voifile.VOI(vo1).Name;
+    fprintf('\n ppi processing for seed:  %s' , seed_name);
+    
+    for vt = 1:length(vtcfiles)
+        vtc = BVQXfile(vtcfiles{vt});
+        vtcnamepart = strsplit(vtcfiles{vt}, '\');
+        vtcnamepart = strsplit(vtcnamepart{6}, '.');
+        vtcnamepart = vtcnamepart{1};
+        seed_rtc = zscore(vtc.VOITimeCourseOrig(seed_coords));
+        
+        if GENERATE_DMS
+            %% 1. define interaction predictors
+            sdm = BVQXfile(sdmfiles{vt});
+            prdA = zscore(sdm.SDMMatrix(:,prdAcol));
+            prdB = zscore(sdm.SDMMatrix(:,prdBcol));
+            constant = sdm.SDMMatrix(:,constant_col);
+            
+            %% 2. define main predictors
+            seedA = zscore(seed_rtc) .* prdA ;
+            seedB = zscore(seed_rtc) .* prdB ;
+            all_prds = [seedA, seedB, prdA, prdB, seed_rtc, constant];
+            
+            %% 3. write sdm file
+            fid = fopen([OUTPUTDIR_DMS '\' seed_name '_'  vtcnamepart '.sdm'],'wt');
+            % sdm header :
+            fprintf(fid,'\n%s\n','FileVersion:            1');
+            fprintf(fid,'\n%s\n','NrOfPredictors:         6');
+            fprintf(fid,'\n%s%\n',['NrOfDataPoints:         ', num2str(size(vtc.VTCData,1))]);
+            fprintf(fid,'\n%s\n','IncludesConstant:       0') ;
+            fprintf(fid,'\n%s\n','FirstConfoundPredictor: 3') ;
+            fprintf(fid,'\n%s\n','255 0 255   0 255 255   255 0 0   0 255 0   0 0 255') ;
+            fprintf(fid,'\n%s\n', PRD_LIST) ;
+            for row = 1:size(all_prds,1)
+                string = sprintf('%6.6f\t',all_prds(row,:));
+                fprintf(fid,'%s\r\n',string);
+            end
+            fclose(fid);
+            sdm.ClearObject; clear sdm;
+        end
+        
+        %% 5. do manual VOIGLM and extract voi's betas
+        if GENERATE_GLM
+            for sub = 1:length(subdirs)
+                vtcs = concat_vtcs(sub_vtcfiles);
+            ppi_sdm = BVQXfile([OUTPUTDIR_DMS '\' seed_name '_'  vtcnamepart '.sdm']);
+            [b, p]  = voiglm(ppi_sdm, vtc, CONTRASTS', voifile);
+            beta_mat(vt,vo1,:,:) = b; % (vtc, voi1(seed), voi2, contrast)
+            pval_mat(vt,vo1,:,:) = p;
+            vtc.ClearObject; clear vtc;
+        end
+    end
+    voi_list{vo1} = seed_name;
+end
+save(['ppi_VOIGLM-' GLM_NAME '.mat'], 'beta_mat', 'pval_mat', 'CONTRASTS', 'voi_list');
+
+
+
+%% plot results
+meanb_ML_mat = mean(beta_mat(:,:,:,1),1);
+meanb_MH_mat = mean(beta_mat(:,:,:,2),1);
+meanp_ML_mat = mean(pval_mat(:,:,:,1),1);
+meanp_MH_mat = mean(pval_mat(:,:,:,2),1);
+meanp_ML_mat(meanp_ML_mat > 0.1) = 1;
+meanp_MH_mat(meanp_MH_mat > 0.1) = 1;
+
+meanb_ML_mat = reshape(meanb_ML_mat, size(meanb_ML_mat,2), size(meanb_ML_mat,3));
+meanb_MH_mat = reshape(meanb_MH_mat, size(meanb_MH_mat,2), size(meanb_MH_mat,3));
+meanp_ML_mat = reshape(meanp_ML_mat, size(meanp_ML_mat,2), size(meanp_ML_mat,3));
+meanp_MH_mat = reshape(meanp_MH_mat, size(meanp_MH_mat,2), size(meanp_MH_mat,3));
+
+subplot(1,2,1)
+imagesc(meanb_MH_mat-meanb_ML_mat);
+set(gca,'XTickLabel',voi_list)
+set(gca,'YTickLabel',voi_list)
+set(gca,'FontSize', 7)
+set(gca,'XTick',1:length(voifile.VOI));
+set(gca,'YTick',1:length(voifile.VOI));
+set(gca,'XAxisLocation','top');
+title('delta Mask (High > Low)');
+caxis([-0.0675, 0.0675]);
+
+subplot(1,2,2)
+imagesc(meanp_MH_mat);
+set(gca,'XTickLabel',voi_list)
+set(gca,'YTickLabel',voi_list)
+set(gca,'FontSize', 7)
+set(gca,'XTick',1:length(voifile.VOI));
+set(gca,'YTick',1:length(voifile.VOI));
+set(gca,'XAxisLocation','top');
+title('P Val - MSK HIGH');
+
+% subplot(2,2,3)
+% imagesc(meanb_ML_mat);
+% set(gca,'XTickLabel',voi_list)
+% set(gca,'YTickLabel',voi_list)
+% set(gca,'FontSize', 7)
+% set(gca,'XTick',1:length(voifile.VOI));
+% set(gca,'YTick',1:length(voifile.VOI));
+% set(gca,'XAxisLocation','top');
+% title('Mean Beta - MSK LOW');
+% caxis([-0.0675, 0.0675]);
+%
+% subplot(2,2,4)
+% imagesc(meanp_ML_mat);
+% set(gca,'XTickLabel',voi_list)
+% set(gca,'YTickLabel',voi_list)
+% set(gca,'FontSize', 7)
+% set(gca,'XTick',1:length(voifile.VOI));
+% set(gca,'YTick',1:length(voifile.VOI));
+% set(gca,'XAxisLocation','top');
+% title('P Val - MSK LOW');
+
+
+% TODO:
+% 2nd level GLM:
+%   should I concat the vtcs and SDMs or can I average betas
+% contrasts - same as the GLM
+% p values - within subjects (vtcs)
+
+
+
+
+
+
