@@ -72,22 +72,11 @@ for vo1 = 1:size(voifile.VOI,2)
             [b, p]  = voiglm(subdirs{sub}, INPUTPAT_VTC, OUTPUTDIR_DMS, seed_name, CONTRASTS', voifile);
             beta_mat(sub,vo1,:,:) = b; % (vtc, voi1(seed), voi2, contrast)
             pval_mat(sub,vo1,:,:) = p;
-            vtc.ClearObject; clear vtc;
         end
     end
     voi_list{vo1} = seed_name;
 end
 save(['ppi_VOIGLM-' GLM_NAME '.mat'], 'beta_mat', 'pval_mat', 'CONTRASTS', 'voi_list');
-
-
-
-
-
-% TODO:
-% 2nd level GLM:
-%   should I concat the vtcs and SDMs or can I average betas
-% contrasts - same as the GLM
-% p values - within subjects (vtcs)
 
 
 
