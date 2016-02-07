@@ -59,7 +59,6 @@ for sd = 1:length(sdmfiles)
     sdmdata{sd} = sdm.SDMMatrix;
     sdm.ClearObject();
 end
-sdm.ClearObject();
 
 
 %%
