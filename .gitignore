@@ -5,3 +5,7 @@
 *.txt
 *.jpeg
 *.vmp
+*.p
+*.fig
+*.pyc
+*.pdf

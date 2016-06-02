@@ -2,7 +2,7 @@
 clear all; close all; clc;
 
 %% PARAMETERS
-INPUTFILE_VOI = 'G:\study3_CFS_fMRI_v2\data\mirror_loc_final_ppisorted.voi';
+INPUTFILE_VOI = 'G:\study3_CFS_fMRI_v2\data\mirror_loc_final.voi';
 INPUTDIR      = 'G:\study3_CFS_fMRI_v2\data';
 INPUTPAT_VTC  = '*_nmsk*mm.vtc'; % only msk vtcs
 INPUTPAT_SDM  = '*_nmsk*mm*.sdm';

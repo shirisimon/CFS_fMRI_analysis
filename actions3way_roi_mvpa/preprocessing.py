@@ -49,7 +49,7 @@ class DataLoader(object):
 
 class Preprocessing(DataLoader):
 
-    def get_sub_raw_data(self, voi):
+    def get_sub_data(self, voi):
         for sub in self.params.sublist:
             X_tr, y_tr = self.get_concat_vols_and_labels(sub+self.params.tr_pattern, voi)
             X_te, y_te = self.get_concat_vols_and_labels(sub+self.params.te_pattern, voi)
@@ -111,14 +111,18 @@ class Preprocessing(DataLoader):
         prt = self.get_prt_data(vtc_idx)
         cvols = []
         clbls = []  # labels
-        for cond in xrange(len(prt)):
-            vols = self.extract_cond_vols(vtc_data, prt[cond], self.params.tpoi, self.params.baseline)
-            lbls = vols.shape[0] * [cond]
-            cvols.append(vols)                                             # concat conditions volumes of one vtc file
-            clbls.append(lbls)                                             # concat conditions labels of one vtc file
-        cvols = [c for c in np.array(cvols)]
-        clbls = [l for l in np.array(clbls)]
-        return np.concatenate((cvols)), np.concatenate((clbls))
+        if self.params.fmri_data_type == 'raw':
+            for cond in xrange(len(prt)):
+                vols = self.extract_cond_vols(vtc_data, prt[cond], self.params.tpoi, self.params.baseline)
+                lbls = vols.shape[0] * [cond]
+                cvols.append(vols)                                             # concat conditions volumes of one vtc file
+                clbls.append(lbls)                                             # concat conditions labels of one vtc file
+            cvols = [c for c in np.array(cvols)]
+            clbls = [l for l in np.array(clbls)]
+            return np.concatenate((cvols)), np.concatenate((clbls))
+        else: # betas
+            pass
+
 
     def extract_cond_vols(self, vtc_data, onsets, tpoi, baseline):
         """
@@ -137,6 +141,7 @@ class Preprocessing(DataLoader):
             return np.true_divide(vtc_data[cond_tpoi, :],vtc_data[cond_baseline, :])
         else:
             return vtc_data[cond_tpoi, :]
+
 
     def scale_vtc(self, vtc_idx, voi_idx):
         mat = self.get_vtc_data(vtc_idx, voi_idx)
@@ -161,10 +166,7 @@ class Preprocessing(DataLoader):
             scaler = StandardScaler()
             steps.append(('scale', scaler))
         if self.params.do_pca:
-            pca = decomposition.FactorAnalysis()
-            # pca = VarianceThreshold()
-            # pca = decomposition.KernelPCA(kernel='rbf')
-            # pca = decomposition.PCA(n_components=self.params.pca_variance)
+            pca = self.params.pca_type
             steps.append(('pca', pca))
         elif self.params.do_feature_selection:
             fsl = SelectFromModel(configuration.FeatureSelector().logistic_regression())
@@ -211,6 +213,17 @@ class Preprocessing(DataLoader):
             y_tr, y_te = y[train_index], y[test_index]
         return X_tr, X_te, y_tr, y_te
 
+    def chunks_split(self, X, y, chunks=15, te_chunk_idx=0):
+        all_trials = np.array(range(X.shape[0]))
+        chunk_size = len(y)/chunks
+        chunk_1st_idx = (chunk_size*te_chunk_idx)
+        chunk_idx = np.array([i+chunk_1st_idx for i in range(chunk_size)])
+        mask = np.ones(all_trials.shape,dtype=bool)
+        mask[chunk_idx] = False
+        not_in_chunk_idx = all_trials[mask]
+        X_tr, X_te = X[not_in_chunk_idx], X[chunk_idx]
+        y_tr, y_te = y[not_in_chunk_idx], y[chunk_idx]
+        return X_tr, X_te, y_tr, y_te
 
     def remove_nans_and_zeros(self, X, y):
         """
