@@ -1,13 +1,19 @@
 
 import configuration
 import h5py
-from scipy import stats
+import itertools
+import time
 import numpy as np
+import matplotlib.pylab as plt
+
+from scipy import stats
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn import decomposition
 from sklearn.feature_selection import SelectFromModel
 from sklearn.cross_validation import StratifiedShuffleSplit
+from termcolor import colored
+
 
 
 class DataLoader(object):
@@ -238,9 +244,9 @@ class Preprocessing(DataLoader):
         X = np.delete(X, nan_ridx, 0)
         y = np.delete(y, nan_ridx, 0)
 
-        zeros_cidx = np.where(np.all(X == 0.0, axis=0))[0]  # index of columns with all zeros
+        zeros_cidx = np.where(np.all(X == 0.0, axis=0))[0]   # index of columns with all zeros
         X = np.delete(X, zeros_cidx, 1)
-        zeros_ridx = np.where(np.any(X == 0.0, axis=1))[0]  # index of rows with all zeros
+        zeros_ridx = np.where(np.any(X == 0.0, axis=1))[0]   # index of rows with all zeros
         X = np.delete(X, zeros_ridx, 0)
         y = np.delete(y, zeros_ridx, 0)
 
@@ -255,12 +261,107 @@ class Preprocessing(DataLoader):
         """
         nan_cidx = np.where(np.all(np.isnan(X), axis=0))[0]  # index of columns with all nans
         X = np.delete(X, nan_cidx, 1)
-        zeros_cidx = np.where(np.all(X == 0.0, axis=0))[0]  # index of columns with all zeros
+        zeros_cidx = np.where(np.all(X == 0.0, axis=0))[0]   # index of columns with all zeros
         X = np.delete(X, zeros_cidx, 1)
         return X
 
     def convert(self, pipe, X):
         if pipe is not None:
-            return pipe.transform(X)
+            X_transform = pipe.transform(X)
+            X_transform_clean = self.remove_nans_and_zeros_cols(X_transform)
+            if X_transform_clean.shape[1] < X_transform.shape[1]:
+                print ("X features_num was reduced by additional {} features".format(X_transform.shape[1]-X_transform_clean.shape[1]))
+            return X_transform_clean
         else:
             return X
+
+
+class MultiT(object):
+    """
+    perform multivariate t test (t test on high dimensional data)
+    """
+
+    def multit_real(self, X, y):
+        t_stats = []
+        for actions_pair in itertools.combinations(np.unique(y),2):
+            X_action1 = X[np.where(y==actions_pair[0])[0],:]
+            X_action2 = X[np.where(y==actions_pair[1])[0],:]
+            self.plot_data_heatmap(X_action1, X_action2)
+            t_stats.append(self.calc_multit_stat(X_action1, X_action2))
+
+        return np.mean(t_stats)
+
+    def multit_shuffle(self, X, y, n_perms):
+        perms_count = 0
+        perms_tstat = []
+        t = time.time()
+        while perms_count < n_perms:
+            t_stats = []
+            for actions_pair in itertools.combinations(np.unique(y),2):
+                X_action1 = X[np.where(y==actions_pair[0])[0],:]
+                X_action2 = X[np.where(y==actions_pair[1])[0],:]
+                idx_perm1 = np.random.choice(range(X_action1.shape[0]), X_action1.shape[0]/2, replace=False)
+                idx_perm2 = [i for i in range(X_action1.shape[0]) if i not in idx_perm1]
+                X_actions_perm1 = np.concatenate((X_action1[idx_perm1,:], X_action2[idx_perm2,:]))
+                X_actions_perm2 = np.concatenate((X_action1[idx_perm2,:], X_action2[idx_perm1,:]))
+                t_stats.append(self.calc_multit_stat(X_actions_perm1, X_actions_perm2))
+            perms_count = perms_count+1
+            perms_tstat.append(np.mean(t_stats))
+            # if np.mod(perms_count,n_perms/4.)==0:
+            #    print colored("done {:0.2f}% permutations | {:05.2f}s elapsed".format(perms_count*100/float(n_perms), time.time()-t),'yellow')
+        return perms_tstat
+
+
+    def calc_multit_stat(self, X_act1, X_act2):
+        X_act1_mean = np.mean(X_act1, axis=0)
+        X_act2_mean = np.mean(X_act2, axis=0)
+        deltamean = X_act1_mean - X_act2_mean
+        N_act1 = X_act1.shape[0]
+        N_act2 = X_act1.shape[0]
+        S_act1 = np.cov(X_act1.T)
+        S_act2 = np.cov(X_act2.T)
+        N = N_act1+N_act2-2
+        S = ((N_act1-1)*S_act1 + (N_act2-1)*S_act2)/N                                                                    # TODO: verify this is element wise
+        diag = lambda data: 1/data * (np.eye(data.shape[0], data.shape[1]))
+        dinv = diag(S)
+        R = np.dot(np.dot(np.sqrt(dinv),S), np.sqrt(dinv))
+        traceR2_of_corr_delta = np.trace(np.dot(R.T,R))
+
+        p = X_act1.shape[1]
+        numerator = np.dot(np.dot(((N_act1+N_act2)/2), deltamean), np.dot(dinv,deltamean.T)) - p
+        denominator = 2*(traceR2_of_corr_delta - (p**2/N))
+        cPn = 1+(traceR2_of_corr_delta/(p**(3/2.)))
+        return numerator / np.sqrt(denominator*cPn)
+
+    def calc_pval(self, treal, tshuffle):
+        treal = np.repeat(treal, len(tshuffle))
+        pval = np.mean(treal<tshuffle)
+        if pval == 0:
+            pval = 1./len(tshuffle)
+        return pval
+
+    def tshuffle_bootstrap(self, sub_tshuffles, n_perms):
+        perms_count = 0
+        perms_tstat = []
+        t = time.time()
+        while perms_count < n_perms:
+            t_stats = []
+            bootstrap_idx = np.random.choice(range(len(sub_tshuffles[0])),len(sub_tshuffles))
+            for s in range(len(sub_tshuffles)):
+                t_stats.append(sub_tshuffles[s][bootstrap_idx[s]])
+            perms_tstat.append(np.mean(t_stats))
+            # if np.mod(perms_count,n_perms/4.)==0:
+            #    print colored("done {:0.2f}% group permutations | {:05.2f}s elapsed".format(perms_count*100/float(n_perms), time.time()-t),'yellow')
+            perms_count = perms_count+1
+        return perms_tstat
+
+    def plot_data_heatmap(self, mat1, mat2):
+        mat1 = np.mean(mat1,axis=0)
+        mat2 = np.mean(mat2,axis=0)
+        heatmap, edges1, edges2 = np.histogram2d(mat1, mat2, bins=50)
+        extent = [edges1[0], edges2[-1], edges2[0], edges2[-1]]
+        plt.clf()
+        plt.imshow(heatmap, extent=extent)
+        plt.show()
+        return
+

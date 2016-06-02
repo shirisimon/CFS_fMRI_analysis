@@ -1,17 +1,17 @@
 %% ppi_results_plotsAndStat
 
-load('ppi_VOIGLM-MA_manual_voisorted.mat'); ma_mat = beta_mat;
-load('ppi_VOIGLM-NM_manual_voisorted.mat'); nm_mat = beta_mat;
+load('ppi_VOIGLM-MA_newvois.mat'); ma_mat = beta_mat;
+load('ppi_VOIGLM-NM_newvois.mat'); nm_mat = beta_mat;
 
 delta_ma = ma_mat(:,:,:,2) - ma_mat(:,:,:,1); % masked High > Low
 delta_nm = nm_mat(:,:,:,2) - nm_mat(:,:,:,1); % non-masked High > Low
 
-effect_size_mat = delta_ma - delta_nm;
-avg_effect_size = mean(effect_size_mat(:,:,:,1),1);
-avg_effect_size = reshape(avg_effect_size, size(avg_effect_size,2), ...
-    size(avg_effect_size,3));
+% effect_size_mat = delta_ma - delta_nm;
+% avg_effect_size = mean(effect_size_mat(:,:,:,1),1);
+% avg_effect_size = reshape(avg_effect_size, size(avg_effect_size,2), ...
+%     size(avg_effect_size,3));
 
-% M(H>L) Statistics: 
+% MA(H>L) Statistics: 
 for vo1 = 1:size(ma_mat,2)
     for vo2 = 1:size(ma_mat,3)
         [~,p_ma(vo1,vo2)] = ttest(ma_mat(:,vo1,vo2,2), ma_mat(:,vo1,vo2,1), 'tail', 'right');
@@ -22,7 +22,7 @@ q_ma = reshape(adj_p, size(p_ma,1), size(p_ma,2));
 p_ma(p_ma > 0.05) = 1;
 q_ma(q_ma > 0.05) = 1;
 
-% M(H>L) Statistics: 
+% NM(H>L) Statistics: 
 for vo1 = 1:size(nm_mat,2)
     for vo2 = 1:size(nm_mat,3)
         [~,p_nm(vo1,vo2)] = ttest(nm_mat(:,vo1,vo2,2), nm_mat(:,vo1,vo2,1), 'tail', 'right');
@@ -34,7 +34,7 @@ p_nm(p_nm > 0.05) = 1;
 q_nm(q_nm > 0.05) = 1;
 
 
-% M>NM Statistics:
+% MA>NM Statistics:
 for vo1 = 1:size(delta_ma,2)
     for vo2 = 1:size(delta_ma,3)
         [~,p(vo1,vo2)] = ttest(delta_ma(:,vo1,vo2), delta_nm(:,vo1,vo2), 'tail', 'right');

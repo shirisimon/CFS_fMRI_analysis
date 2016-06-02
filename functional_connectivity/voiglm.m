@@ -23,8 +23,8 @@ for vo2 = 1:size(voi.VOI,2);
         voi2_rtc    = [voi2_rtc; vtc.VOITimeCourseOrig(voi2_coords)];
         vtc.ClearObject; clear vtc;  
     end
-    X = design_mat;
-    y = voi2_rtc;
+    X = double(design_mat);
+    y = double(voi2_rtc);
     b = (X'*X)^(-1)*X'*y;
     e = y - X*b; 
     for c = 1:size(contrasts,2)

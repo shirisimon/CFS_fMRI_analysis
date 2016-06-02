@@ -2,19 +2,19 @@
 clear all; close all; clc;
 
 %% PARAMETERS
-INPUTFILE_VOI = 'G:\study3_CFS_fMRI_v2\data\mirror_loc_final.voi';
+INPUTFILE_VOI = 'G:\study3_CFS_fMRI_v2\data\mirror_loc_v2.voi';
 INPUTDIR      = 'G:\study3_CFS_fMRI_v2\data';
-INPUTPAT_VTC  = '*_nmsk*mm.vtc'; % only msk vtcs
-INPUTPAT_SDM  = '*_nmsk*mm*.sdm';
+INPUTPAT_VTC  = '*_msk*mm.vtc'; % only msk vtcs
+INPUTPAT_SDM  = '*_msk*mm_VTC*.sdm';
 OUTPUTDIR_DMS = 'G:\study3_CFS_fMRI_v2\data\ppi_dms';
 PRD_LIST      = '"seedvoi*NML" "seedvoi*NMH" "prdNML" "prdNMH" "seedvoi" "constant"';
-GLM_NAME      = 'NM_manual_voisorted';
+GLM_NAME      = 'MA_newvois';
 GENERATE_DMS  = 0; % generate sdms
 GENERATE_GLM  = 1;
 CONTRASTS     = [1 0 0 0 0 0; 0 1 0 0 0 0]; % contrasts for not-confound predictors
 
-prdAcol       = 3; % colunm number in sdm file of condition A
-prdBcol       = 4; % colunm number in sdm file of condition B
+prdAcol       = 1; % colunm number in sdm file of condition A
+prdBcol       = 2; % colunm number in sdm file of condition B
 constant_col  = 7; % colunm number in sdm file of the constant
 
 voifile  = BVQXfile(INPUTFILE_VOI);
@@ -30,7 +30,7 @@ for vo1 = 1:size(voifile.VOI,2)
     fprintf('\n ppi processing for seed:  %s' , seed_name);
     
     if GENERATE_DMS
-        for vt = 1:length(vtcfiles)
+        for vt = 9:length(vtcfiles)
             vtc = BVQXfile(vtcfiles{vt});
             vtcnamepart = strsplit(vtcfiles{vt}, '\');
             vtcnamepart = strsplit(vtcnamepart{6}, '.');
